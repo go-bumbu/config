@@ -1,0 +1,31 @@
+{
+  "general": {
+    "port": 8080,
+    "log_level": "info"
+  },
+  "isDevMode": true,
+  "nested": {
+    "child": {
+      "list": [
+        {
+          "name": "item1",
+          "value": "value1"
+        },
+        {
+          "name": "item2",
+          "value": "value2"
+        }
+      ]
+    }
+  },
+  "plugins": {
+    "plugin1": {
+      "config1": "value1",
+      "config2": 123
+    },
+    "plugin2": {
+      "config1": "value2",
+      "config2": 456
+    }
+  }
+}

@@ -1,0 +1,43 @@
+# basic top level fields
+number: 60
+floatNum: 3.14
+text: this is a string
+fileContent: "@./sampledata/secretfile" # this should load the content of the file on path ./secretfile
+bol: true
+
+# couple of lists
+listNum:
+  - 1
+  - 2
+  - 3
+
+listString:
+  - "sting 1"
+  - "string 2"
+
+userList:
+  - name: u1
+    pass: p1
+  - name: u2
+    pass: p2
+  - pass: p3
+
+# this should be unmarshalled into a map[string]struct
+map:
+  item1:
+    key: a
+    value: b
+  item2:
+    key: c
+    value: d
+
+# this is a nested struct
+nested:
+  child:
+    number: 61
+    text: this is a string 2
+    bol: true
+    renamed: renamedString
+  child_2:
+    number: 62
+

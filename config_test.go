@@ -1,24 +1,65 @@
 package config
 
 import (
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/go-cmp/cmp"
 	"os"
 	"testing"
 )
 
-// todo set own struct annotations like `config:fieldName, required`
+type myCfg struct {
+	fl  float64 `config:"default_float"`
+	fl2 float64 `config:"floatNum"`
+}
+
+var defCfg = myCfg{
+	fl: 35,
+}
+
+var _ = spew.Dump
 
 func TestLoad(t *testing.T) {
 	tcs := []struct {
-		name      string
-		opts      []any
-		envs      map[string]string
-		expectVal map[string]string
+		name        string
+		opts        []any
+		envs        map[string]string
+		expectVal   map[string]string
+		expectedErr string
 	}{
+		{
+			name: "load default",
+			opts: []any{Defaults{defCfg}},
+			expectVal: map[string]string{
+				"default_float": "35",
+			},
+		},
+		{
+			name:        "expect Err if default is not struct",
+			opts:        []any{Defaults{12}},
+			expectedErr: "error loading default values: passed src is not a pointer or struct",
+		},
+		{
+			name: "load default and overlay with file",
+			opts: []any{Defaults{defCfg}, CfgFile{"sampledata/testSingleFile.yaml"}},
+			expectVal: map[string]string{
+				"default_float": "35",
+				"floatNum":      "3.14",
+			},
+		},
+		{
+			name: "load default and overlay with env",
+			opts: []any{Defaults{defCfg}, CfgFile{"sampledata/testSingleFile.yaml"}, EnvVar{"TEST"}},
+			envs: map[string]string{
+				"TEST_FLOATNUM": "6.65",
+			},
+			expectVal: map[string]string{
+				"default_float": "35",
+				"floatNum":      "6.65",
+			},
+		},
 		{
 			name: "load from file",
 			opts: []any{CfgFile{"sampledata/testSingleFile.yaml"}},
-
 			// intentionally setting envs that do NOT apply because we did not set the Option
 			envs: map[string]string{
 				"IGNORE_FLOATNUM": "44.4",
@@ -84,21 +125,31 @@ func TestLoad(t *testing.T) {
 				t.Setenv(k, v)
 			}
 			cfg, err := Load(tc.opts...)
-			if err != nil {
-				t.Fatal(err)
-			}
 
-			t.Run("get values", func(t *testing.T) {
-				for k, v := range tc.expectVal {
-					got, err := cfg.GetString(k)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if diff := cmp.Diff(got, v); diff != "" {
-						t.Errorf("unexpected value (-got +want)\n%s", diff)
-					}
+			if tc.expectedErr != "" {
+				if err == nil {
+					t.Fatal("expected error but none got")
 				}
-			})
+				if diff := cmp.Diff(err.Error(), tc.expectedErr); diff != "" {
+					t.Errorf("unexpected error (-got +want)\n%s", diff)
+				}
+
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Run("get values", func(t *testing.T) {
+					for k, v := range tc.expectVal {
+						got, err := cfg.GetString(k)
+						if err != nil {
+							t.Fatal(err)
+						}
+						if diff := cmp.Diff(got, v); diff != "" {
+							t.Errorf("unexpected value (-got +want)\n%s", diff)
+						}
+					}
+				})
+			}
 
 		})
 	}

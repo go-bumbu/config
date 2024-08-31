@@ -60,6 +60,8 @@ issues:
         - errcheck
         - dupl
         - gosec
+        - nestif
+        - unused
 
     - path: example_test\.go
       linters:

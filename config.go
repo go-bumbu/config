@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-type Config struct {
+type CfgHandler struct {
 	loadEnvs  bool
 	envPrefix string
 	flatData  map[string]any
@@ -19,9 +19,9 @@ type Config struct {
 	writter   func(level, msg string)
 }
 
-func Load(opts ...any) (*Config, error) {
+func Load(opts ...any) (*CfgHandler, error) {
 
-	c := Config{
+	c := CfgHandler{
 		//data:     map[string]interface{}{},
 		flatData: map[string]any{},
 	}
@@ -37,9 +37,9 @@ func Load(opts ...any) (*Config, error) {
 	// load defaults
 	if cl.def != nil {
 		c.info("loading default values")
-		err := flattenStruct(cl.def.Item, c.flatData)
+		err = flattenStruct(cl.def.Item, c.flatData)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error loading default values: %s", err.Error())
 		}
 	}
 
@@ -132,9 +132,7 @@ type cfgLoader struct {
 }
 
 func newCfgLoader(opts []any) (cfgLoader, error) {
-
 	cl := cfgLoader{}
-
 	for _, opt := range opts {
 		switch item := opt.(type) {
 		case Defaults:
@@ -160,7 +158,7 @@ func newCfgLoader(opts []any) (cfgLoader, error) {
 
 const envSep = "_"
 
-func (c *Config) GetString(fieldName string) (string, error) {
+func (c *CfgHandler) GetString(fieldName string) (string, error) {
 	// check ENV firs
 	envName := fieldName
 	if c.envPrefix != "" {
@@ -190,7 +188,7 @@ func (c *Config) GetString(fieldName string) (string, error) {
 
 // fileOrString checks if of a string is supposed to load a file if it starts with @
 // if so, it loads the file and returns the content otherwise it returns the original string
-func (c *Config) fileOrString(in, fieldName string) (string, error) {
+func (c *CfgHandler) fileOrString(in, fieldName string) (string, error) {
 	if strings.HasPrefix(in, "@") {
 		p := strings.TrimPrefix(in, "@")
 		strVal, err := loadFileContent(p)
@@ -204,8 +202,8 @@ func (c *Config) fileOrString(in, fieldName string) (string, error) {
 }
 
 // Subset returns a config that only handles a subset of the overall config
-func (c *Config) Subset(key string) *Config {
-	newC := Config{
+func (c *CfgHandler) Subset(key string) *CfgHandler {
+	newC := CfgHandler{
 		loadEnvs:  c.loadEnvs,
 		envPrefix: c.envPrefix,
 		subset:    c.subset + sep + key,
@@ -216,13 +214,13 @@ func (c *Config) Subset(key string) *Config {
 	return &newC
 }
 
-func (c *Config) info(msg string) {
+func (c *CfgHandler) info(msg string) {
 	if c.writter != nil {
 		c.writter(InfoLevel, msg)
 	}
 }
 
-func (c *Config) Debug(msg string) {
+func (c *CfgHandler) Debug(msg string) {
 	if c.writter != nil {
 		c.writter(DebugLevel, msg)
 	}

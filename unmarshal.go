@@ -11,7 +11,7 @@ import (
 
 // Unmarshal will recursively navigate the struct using reflection and populate the fields based on the
 // flattened config representation
-func (c *Config) Unmarshal(payload any) error {
+func (c *CfgHandler) Unmarshal(payload any) error {
 	c.info("unmarshalling config into struct")
 	_, err := c.unmarshal(reflect.ValueOf(payload), "")
 	if err != nil {
@@ -25,7 +25,7 @@ const sep = "."
 // internal recursive unmarshal function, it returns true if any change was made to the passed pointer
 //
 //nolint:gocognit
-func (c *Config) unmarshal(item reflect.Value, prefix string) (bool, error) {
+func (c *CfgHandler) unmarshal(item reflect.Value, prefix string) (bool, error) {
 	if len(prefix) > 0 {
 		prefix += sep
 	}
@@ -117,7 +117,7 @@ var boolValues = []string{
 // and then overrides with ENVs if any is found for the same key
 //
 //nolint:gocognit,nestif
-func (c *Config) setValue(valueField reflect.Value, fieldName string) (bool, error) {
+func (c *CfgHandler) setValue(valueField reflect.Value, fieldName string) (bool, error) {
 
 	var val reflect.Value
 	changed := false
@@ -218,7 +218,7 @@ func loadFileContent(path string) (string, error) {
 // setSlice takes a single reflect.value of kind slice from a struct to be unmarshalled and sets the value of the slice
 // in order of precedence it checks first if the field name is present in the flattened map
 // and then overrides with ENVs if any is found for the same key
-func (c *Config) setSlice(valueField reflect.Value, fieldName string) (bool, error) {
+func (c *CfgHandler) setSlice(valueField reflect.Value, fieldName string) (bool, error) {
 
 	changed := false
 

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"slices"
 	"strconv"
 	"strings"
 )
@@ -97,21 +96,6 @@ func sanitizeTag(in string) string {
 	return strings.TrimSpace(in)
 }
 
-var boolValues = []string{
-	"1",
-	"t",
-	"T",
-	"TRUE",
-	"true",
-	"True",
-	"0",
-	"f",
-	"F",
-	"FALSE",
-	"false",
-	"False",
-}
-
 // setValue takes a single reflect.value field from a struct to be unmarshalled and sets the value
 // in order of precedence it checks first if the field name is present in the flattened map
 // and then overrides with ENVs if any is found for the same key
@@ -146,15 +130,13 @@ func (c *CfgHandler) setValue(valueField reflect.Value, fieldName string) (bool,
 			changed = true
 			c.Debug(fmt.Sprintf("setting value of field \"%s\" from ENV", fieldName))
 		case reflect.Bool:
-			if slices.Contains(boolValues, envVal) {
-				boolVal, err := strconv.ParseBool(envVal)
-				if err != nil {
-					return changed, fmt.Errorf("unable to convert env to bool %s", err)
-				}
-				val = reflect.ValueOf(boolVal)
-				changed = true
-				c.Debug(fmt.Sprintf("setting value of field \"%s\" from ENV", fieldName))
+			boolVal, err := strconv.ParseBool(envVal)
+			if err != nil {
+				return changed, fmt.Errorf("unable to convert env value to bool %w", err)
 			}
+			val = reflect.ValueOf(boolVal)
+			changed = true
+			c.Debug(fmt.Sprintf("setting value of field \"%s\" from ENV", fieldName))
 		case
 			reflect.String:
 			val = reflect.ValueOf(envVal)

@@ -187,3 +187,42 @@ func TestUnmarshal(t *testing.T) {
 		})
 	}
 }
+
+func TestUnmarshalErrs(t *testing.T) {
+	tcs := []struct {
+		name      string
+		envs      map[string]string
+		expectErr string
+	}{
+		{
+			name: "expect error if wrong boolean",
+
+			envs: map[string]string{
+				"TEST_BOL": "banana",
+			},
+			expectErr: "unable to convert env value to bool strconv.ParseBool: parsing \"banana\": invalid syntax",
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			for k, v := range tc.envs {
+				t.Setenv(k, v)
+			}
+			cfg, err := Load(EnvVar{Prefix: "TEST"})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			got := testConfig{}
+			err = cfg.Unmarshal(&got)
+			if err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if err.Error() != tc.expectErr {
+				t.Errorf("expected '%s', got '%s'", tc.expectErr, err.Error())
+			}
+
+		})
+	}
+}

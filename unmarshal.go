@@ -83,6 +83,37 @@ func (c *CfgHandler) unmarshal(item reflect.Value, prefix string) (bool, error) 
 				changed = true
 			}
 
+		case reflect.Ptr:
+			elem := valueField.Type().Elem()
+			if valueField.IsNil() {
+				valueField.Set(reflect.New(elem))
+			}
+			inner := valueField.Elem()
+			switch inner.Kind() {
+			case reflect.Struct:
+				ch, err := c.unmarshal(valueField, fieldName)
+				if err != nil {
+					return changed, err
+				}
+				if ch {
+					changed = true
+				}
+			case reflect.Bool,
+				reflect.String,
+				reflect.Float64,
+				reflect.Float32,
+				reflect.Int:
+				ch, err := c.setValue(inner, fieldName)
+				if err != nil {
+					return changed, err
+				}
+				if ch {
+					changed = true
+				}
+			default:
+				return changed, fmt.Errorf("unhandled pointer-to type: %q in struct", inner.Kind())
+			}
+
 		default:
 			return changed, fmt.Errorf("unhandled type: \"%s\" in struct", valueField.Kind())
 		}

@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/google/go-cmp/cmp"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 type testConfig struct {
@@ -30,6 +31,18 @@ type Child struct {
 	Number      int    `config:"number"`
 	Text        string `config:"text"`
 	AnotherName string `config:"renamed"`
+}
+
+// configWithPtr is used to test unmarshal case reflect.Ptr (ptr to scalar and ptr to struct).
+type configWithPtr struct {
+	PtrText   *string `config:"ptrText"`
+	PtrNumber *int    `config:"ptrNumber"`
+	PtrNested *Child  `config:"ptrNested"`
+}
+
+// configWithUnhandledPtr has a pointer to a type not supported by unmarshal (int64), used to test error path.
+type configWithUnhandledPtr struct {
+	PtrInt64 *int64 `config:"ptrInt64"`
 }
 
 var DefaultCfg = testConfig{
@@ -226,3 +239,79 @@ func TestUnmarshalErrs(t *testing.T) {
 		})
 	}
 }
+
+func TestUnmarshal_ptr(t *testing.T) {
+	ptrNum42 := 42
+	ptrNum99 := 99
+	tcs := []struct {
+		name         string
+		opts         []any
+		envs         map[string]string
+		expectParams configWithPtr
+	}{
+		{
+			name: "ptr from env",
+			opts: []any{EnvVar{Prefix: "TEST"}},
+			envs: map[string]string{
+				"TEST_PTRTEXT":           "hello",
+				"TEST_PTRNUMBER":         "42",
+				"TEST_PTRNESTED_NUMBER":  "7",
+				"TEST_PTRNESTED_TEXT":    "nested-text",
+				"TEST_PTRNESTED_RENAMED": "from-env",
+			},
+			expectParams: configWithPtr{
+				PtrText:   strPtr("hello"),
+				PtrNumber: &ptrNum42,
+				PtrNested: &Child{Number: 7, Text: "nested-text", AnotherName: "from-env"},
+			},
+		},
+		{
+			name: "ptr from file",
+			opts: []any{CfgFile{"sampledata/testPtrConfig.yaml", true}},
+			envs: nil,
+			expectParams: configWithPtr{
+				PtrText:   strPtr("from-file"),
+				PtrNumber: &ptrNum99,
+				PtrNested: &Child{Number: 11, Text: "nested-from-file", AnotherName: "ptr-nested-renamed"},
+			},
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			for k, v := range tc.envs {
+				t.Setenv(k, v)
+			}
+			cfg, err := Load(tc.opts...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got configWithPtr
+			err = cfg.Unmarshal(&got)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(got, tc.expectParams); diff != "" {
+				t.Errorf("unexpected value (-got +want)\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestUnmarshal_ptrUnhandledType(t *testing.T) {
+	t.Setenv("TEST_PTRINT64", "1")
+	cfg, err := Load(EnvVar{Prefix: "TEST"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got configWithUnhandledPtr
+	err = cfg.Unmarshal(&got)
+	if err == nil {
+		t.Fatal("expected error for unhandled pointer-to type, got nil")
+	}
+	wantErr := "unhandled pointer-to type: \"int64\" in struct"
+	if err.Error() != wantErr {
+		t.Errorf("expected error %q, got %q", wantErr, err.Error())
+	}
+}
+
+func strPtr(s string) *string { return &s }

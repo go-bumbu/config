@@ -1,10 +1,12 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/go-cmp/cmp"
-	"os"
-	"testing"
 )
 
 type myCfg struct {
@@ -196,6 +198,45 @@ func TestLoad(t *testing.T) {
 			}
 
 		})
+	}
+}
+
+func TestLoad_EnvFile(t *testing.T) {
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+	content := "# comment\nTEST_FLOATNUM=99.99\n\nOTHER=ignored\n"
+	if err := os.WriteFile(envPath, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(
+		Defaults{defCfg},
+		CfgFile{"sampledata/testSingleFile.yaml", true},
+		EnvFile{Path: envPath, Mandatory: true},
+		EnvVar{Prefix: "TEST"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Value should come from .env (99.99), not from YAML (3.14)
+	got, err := cfg.GetString("floatNum")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "99.99" {
+		t.Errorf("floatNum: got %q, want 99.99 (from .env)", got)
+	}
+}
+
+func TestLoad_EnvFileOptional(t *testing.T) {
+	// Non-mandatory missing .env should not error
+	_, err := Load(
+		Defaults{defCfg},
+		EnvFile{Path: filepath.Join(t.TempDir(), "nonexistent.env"), Mandatory: false},
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

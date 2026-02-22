@@ -23,7 +23,7 @@ const sep = "."
 
 // internal recursive unmarshal function, it returns true if any change was made to the passed pointer
 //
-//nolint:gocognit// accepted complexity for now
+//nolint:gocognit,gocyclo // accepted complexity for now
 func (c *CfgHandler) unmarshal(item reflect.Value, prefix string) (bool, error) {
 	if len(prefix) > 0 {
 		prefix += sep

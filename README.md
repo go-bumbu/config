@@ -19,6 +19,7 @@ For that reason i started writing this one.
 * load your configuration into one struct
 * use default configuration
 * load configuration from files on disk
+* load environment variables from a .env file (optional, e.g. for local secrets)
 * use environment variables to overwrite configuration
 
 
@@ -35,6 +36,7 @@ Example taken from example test
 _,err   = config.Load(
     config.Defaults{Item: defaultCfg},                                   // use default values
     config.Overrides{Item: overrides},                                   // set possible override values
+    config.EnvFile{Path: ".env", Mandatory: false},                       // optional: load KEY=VALUE from .env
     config.CfgFile{Path: "sampledata/example_test/example.config.json"}, // load config from file
     config.EnvVar{Prefix: "ENVPREFIX"},                                  // load a config value from an env
     config.Unmarshal{Item: &cfg},                                        // marshal result into cfg

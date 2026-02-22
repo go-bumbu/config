@@ -1,0 +1,7 @@
+# used by unmarshal_test for ptr case coverage
+ptrText: from-file
+ptrNumber: 99
+ptrNested:
+  number: 11
+  text: nested-from-file
+  renamed: ptr-nested-renamed

@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 type CfgHandler struct {
@@ -32,6 +33,13 @@ func Load(opts ...any) (*CfgHandler, error) {
 	// set writer
 	if cl.writer != nil {
 		c.writter = cl.writer.Fn
+	}
+
+	// load .env file first so EnvVar sees these values when unmarshalling
+	if cl.envFile != nil {
+		if err := loadEnvFile(&c, cl.envFile.Path, cl.envFile.Mandatory); err != nil {
+			return nil, err
+		}
 	}
 
 	// load defaults
@@ -168,9 +176,10 @@ type cfgLoader struct {
 	overrides *Overrides
 	files     []*CfgFile
 	//dir    *CfgDir
-	env    *EnvVar
-	writer *Writer
-	unmar  *Unmarshal
+	envFile *EnvFile
+	env     *EnvVar
+	writer  *Writer
+	unmar   *Unmarshal
 }
 
 func newCfgLoader(opts []any) (cfgLoader, error) {
@@ -186,6 +195,8 @@ func newCfgLoader(opts []any) (cfgLoader, error) {
 		case CfgDir:
 			// TODO
 			panic("not implemented")
+		case EnvFile:
+			cl.envFile = &item
 		case EnvVar:
 			cl.env = &item
 		case Writer:

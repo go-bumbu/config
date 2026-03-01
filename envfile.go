@@ -17,7 +17,9 @@ type EnvFile struct {
 }
 
 // loadEnvFile reads path and sets os.Setenv for each KEY=VALUE line.
-// Supports # comments, empty lines, and optional double/single-quoted values.
+// Only sets variables that are not already in the environment, so explicit
+// env vars (e.g. from shell) override .env. Supports # comments, empty lines,
+// and optional double/single-quoted values.
 func loadEnvFile(c *CfgHandler, path string, mandatory bool) error {
 	// #nosec G304 -- path is from config option (EnvFile.Path), not arbitrary user input
 	f, err := os.Open(path)
@@ -49,8 +51,10 @@ func loadEnvFile(c *CfgHandler, path string, mandatory bool) error {
 			continue
 		}
 		val = unquoteEnvVal(val)
-		if err := os.Setenv(key, val); err != nil {
-			return fmt.Errorf("ENV file %s line %d: setenv %q: %w", path, lineNum, key, err)
+		if os.Getenv(key) == "" {
+			if err := os.Setenv(key, val); err != nil {
+				return fmt.Errorf("ENV file %s line %d: setenv %q: %w", path, lineNum, key, err)
+			}
 		}
 	}
 	return scanner.Err()

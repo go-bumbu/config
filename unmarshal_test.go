@@ -174,6 +174,22 @@ func TestUnmarshal(t *testing.T) {
 			opts:         []any{Defaults{DefaultCfg}, EnvVar{}},
 			expectParams: DefaultCfg,
 		},
+		{
+			name: "env overrides bool default to false",
+			opts: []any{Defaults{testConfig{Bol: true}}, EnvVar{}},
+			envs: map[string]string{
+				"BOL": "false",
+			},
+			expectParams: testConfig{Bol: false},
+		},
+		{
+			name: "env overrides bool default to true",
+			opts: []any{Defaults{testConfig{Bol: false}}, EnvVar{}},
+			envs: map[string]string{
+				"BOL": "true",
+			},
+			expectParams: testConfig{Bol: true},
+		},
 	}
 
 	for _, tc := range tcs {

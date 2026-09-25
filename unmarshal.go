@@ -30,7 +30,7 @@ func (c *CfgHandler) unmarshal(item reflect.Value, prefix string) (bool, error) 
 	}
 
 	// make sure we always pass in a pointer to a struct
-	if item.Kind() != reflect.Ptr {
+	if item.Kind() != reflect.Pointer {
 		return false, fmt.Errorf("passed argument is not a pointer")
 	}
 	item = item.Elem()
@@ -83,35 +83,36 @@ func (c *CfgHandler) unmarshal(item reflect.Value, prefix string) (bool, error) 
 				changed = true
 			}
 
-		case reflect.Ptr:
-			elem := valueField.Type().Elem()
+		case reflect.Pointer:
+			// a nil pointer is only allocated when a source sets a value, so that
+			// nil keeps meaning "not set" for missing, blank or null keys
+			target := valueField
 			if valueField.IsNil() {
-				valueField.Set(reflect.New(elem))
+				target = reflect.New(valueField.Type().Elem())
 			}
-			inner := valueField.Elem()
+			inner := target.Elem()
+			var ch bool
+			var err error
 			switch inner.Kind() {
 			case reflect.Struct:
-				ch, err := c.unmarshal(valueField, fieldName)
-				if err != nil {
-					return changed, err
-				}
-				if ch {
-					changed = true
-				}
+				ch, err = c.unmarshal(target, fieldName)
 			case reflect.Bool,
 				reflect.String,
 				reflect.Float64,
 				reflect.Float32,
 				reflect.Int:
-				ch, err := c.setValue(inner, fieldName)
-				if err != nil {
-					return changed, err
-				}
-				if ch {
-					changed = true
-				}
+				ch, err = c.setValue(inner, fieldName)
 			default:
 				return changed, fmt.Errorf("unhandled pointer-to type: %q in struct", inner.Kind())
+			}
+			if err != nil {
+				return changed, err
+			}
+			if ch {
+				changed = true
+				if valueField.IsNil() {
+					valueField.Set(target)
+				}
 			}
 
 		default:
@@ -225,7 +226,7 @@ func (c *CfgHandler) setValue(valueField reflect.Value, fieldName string) (bool,
 }
 
 func loadFileContent(path string) (string, error) {
-	//#nosec G304 - File will only be unmarshalled into struct
+	//#nosec G304 G703 -- the path comes from an "@path" config value, reading that file is the intended feature
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return "", err

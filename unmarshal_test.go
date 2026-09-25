@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -33,11 +35,27 @@ type Child struct {
 	AnotherName string `config:"renamed"`
 }
 
-// configWithPtr is used to test unmarshal case reflect.Ptr (ptr to scalar and ptr to struct).
+// configWithPtr is used to test unmarshal case reflect.Pointer (ptr to scalar and ptr to struct).
 type configWithPtr struct {
 	PtrText   *string `config:"ptrText"`
 	PtrNumber *int    `config:"ptrNumber"`
 	PtrNested *Child  `config:"ptrNested"`
+}
+
+// configWithOptional has a pointer field of each supported kind; a nil pointer
+// means "not set by any source", which a plain field cannot express.
+type configWithOptional struct {
+	Flag   *bool          `config:"flag"`
+	Text   *string        `config:"text"`
+	Number *int           `config:"number"`
+	Float  *float64       `config:"float"`
+	Nested *Child         `config:"nested"`
+	Items  []optionalItem `config:"items"`
+}
+
+type optionalItem struct {
+	Name string `config:"name"`
+	Flag *bool  `config:"flag"`
 }
 
 // configWithUnhandledPtr has a pointer to a type not supported by unmarshal (int64), used to test error path.
@@ -330,4 +348,109 @@ func TestUnmarshal_ptrUnhandledType(t *testing.T) {
 	}
 }
 
+// TestUnmarshal_ptrUnset checks that a pointer field stays nil when no source
+// sets its key (missing, blank or null), while an explicit zero value such as
+// false, "" or 0 still produces a non-nil pointer.
+func TestUnmarshal_ptrUnset(t *testing.T) {
+	tcs := []struct {
+		name         string
+		file         string // the extension selects the format
+		content      string
+		envs         map[string]string
+		preset       configWithOptional // struct content before unmarshal
+		expectParams configWithOptional
+	}{
+		{
+			name:    "keys missing",
+			file:    "cfg.yaml",
+			content: "other: 1\n",
+		},
+		{
+			name:    "keys blank",
+			file:    "cfg.yaml",
+			content: "flag:\ntext:\nnumber:\nfloat:\nnested:\n",
+		},
+		{
+			name:    "keys null",
+			file:    "cfg.json",
+			content: `{"flag": null, "text": null, "number": null, "float": null, "nested": null}`,
+		},
+		{
+			name:    "explicit zero values",
+			file:    "cfg.yaml",
+			content: "flag: false\ntext: \"\"\nnumber: 0\nfloat: 0.0\nnested:\n  number: 0\n",
+			expectParams: configWithOptional{
+				Flag:   ptr(false),
+				Text:   ptr(""),
+				Number: ptr(0),
+				Float:  ptr(0.0),
+				Nested: &Child{},
+			},
+		},
+		{
+			name:         "env var fills a blank key",
+			file:         "cfg.yaml",
+			content:      "flag:\n",
+			envs:         map[string]string{"TEST_FLAG": "false"},
+			expectParams: configWithOptional{Flag: ptr(false)},
+		},
+		{
+			name:    "list entries",
+			file:    "cfg.yaml",
+			content: "items:\n  - name: a\n  - name: b\n    flag:\n  - name: c\n    flag: false\n  - flag: true\n",
+			expectParams: configWithOptional{Items: []optionalItem{
+				{Name: "a"},
+				{Name: "b"},
+				{Name: "c", Flag: ptr(false)},
+				{Flag: ptr(true)},
+			}},
+		},
+		{
+			name:         "preset pointer kept when key missing",
+			file:         "cfg.yaml",
+			content:      "other: 1\n",
+			preset:       configWithOptional{Flag: ptr(true)},
+			expectParams: configWithOptional{Flag: ptr(true)},
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			for k, v := range tc.envs {
+				t.Setenv(k, v)
+			}
+			path := filepath.Join(t.TempDir(), tc.file)
+			if err := os.WriteFile(path, []byte(tc.content), 0600); err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := Load(CfgFile{Path: path, Mandatory: true}, EnvVar{Prefix: "TEST"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := tc.preset
+			err = cfg.Unmarshal(&got)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(got, tc.expectParams); diff != "" {
+				t.Errorf("unexpected value (-got +want)\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestUnmarshal_ptrInvalidValue(t *testing.T) {
+	t.Setenv("TEST_FLAG", "banana")
+	cfg, err := Load(EnvVar{Prefix: "TEST"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got configWithOptional
+	err = cfg.Unmarshal(&got)
+	if err == nil {
+		t.Fatal("expected error for invalid bool in pointer field, got nil")
+	}
+}
+
 func strPtr(s string) *string { return &s }
+
+func ptr[T any](v T) *T { return &v }

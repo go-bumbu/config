@@ -57,6 +57,19 @@ type customCfg struct {
 }
 ```
 
+## Optional values
+
+Use a pointer field when you need to tell "not set" apart from a zero value like `false`, `0` or `""`, e.g.
+
+```
+type customCfg struct {
+	FollowSymlinks *bool `config:"followSymlinks"`
+}
+```
+
+The pointer stays `nil` when no source sets the key (missing, blank or `null`), and an explicit `false`
+gives a pointer to `false`. A pointer to a struct stays `nil` unless at least one of its fields is set.
+
 ## Best practices
 
 when mapping your configuration there are some consideration that will make your live easier:

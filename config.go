@@ -310,11 +310,11 @@ func flatten(prefix string, src map[string]any, dest map[string]any) {
 func flattenStruct(src any, dest map[string]any) error {
 	// make sure we always pass in a pointer to a struct
 	item := reflect.ValueOf(src)
-	if item.Kind() != reflect.Ptr && item.Kind() != reflect.Struct {
+	if item.Kind() != reflect.Pointer && item.Kind() != reflect.Struct {
 		return fmt.Errorf("passed src is not a pointer or struct")
 	}
 
-	if item.Kind() == reflect.Ptr {
+	if item.Kind() == reflect.Pointer {
 		item = item.Elem()
 		if item.Kind() != reflect.Struct {
 			return fmt.Errorf("passed argument is not a pointer to a struct")
